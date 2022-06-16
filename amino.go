@@ -141,7 +141,8 @@ func (typ Typ3) String() string {
 func (cdc *Codec) MarshalBinaryLengthPrefixed(o interface{}) ([]byte, error) {
 
 	// Write the bytes here.
-	var buf = new(bytes.Buffer)
+	buf := GetBuffer()
+	defer PutBuffer(buf)
 
 	// Write the bz without length-prefixing.
 	bz, err := cdc.MarshalBinaryBare(o)
@@ -150,7 +151,7 @@ func (cdc *Codec) MarshalBinaryLengthPrefixed(o interface{}) ([]byte, error) {
 	}
 
 	// Write uvarint(len(bz)).
-	err = EncodeUvarintToBuffer(buf, uint64(len(bz)))
+	err = EncodeUvarintToBuffer(&buf.Buffer, uint64(len(bz)))
 	if err != nil {
 		return nil, err
 	}
@@ -161,13 +162,16 @@ func (cdc *Codec) MarshalBinaryLengthPrefixed(o interface{}) ([]byte, error) {
 		return nil, err
 	}
 
-	return buf.Bytes(), nil
+	bytesCopy := GetBytesBufferCopy(&buf.Buffer)
+
+	return bytesCopy, nil
 }
 
 func (cdc *Codec) MarshalBinaryLengthPrefixedWithRegisteredMarshaller(o interface{}) ([]byte, error) {
 
 	// Write the bytes here.
-	var buf = new(bytes.Buffer)
+	buf := GetBuffer()
+	defer PutBuffer(buf)
 
 	// Write the bz without length-prefixing.
 	bz, err := cdc.MarshalBinaryBareWithRegisteredMarshaller(o)
@@ -176,7 +180,7 @@ func (cdc *Codec) MarshalBinaryLengthPrefixedWithRegisteredMarshaller(o interfac
 	}
 
 	// Write uvarint(len(bz)).
-	err = EncodeUvarintToBuffer(buf, uint64(len(bz)))
+	err = EncodeUvarintToBuffer(&buf.Buffer, uint64(len(bz)))
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +191,7 @@ func (cdc *Codec) MarshalBinaryLengthPrefixedWithRegisteredMarshaller(o interfac
 		return nil, err
 	}
 
-	return buf.Bytes(), nil
+	return GetBytesBufferCopy(&buf.Buffer), nil
 }
 
 // MarshalBinaryLengthPrefixedWriter writes the bytes as would be returned from
@@ -237,8 +241,8 @@ func (cdc *Codec) MarshalBinaryBare(o interface{}) ([]byte, error) {
 	}
 
 	// Encode Amino:binary bytes.
-	var bz []byte
-	buf := new(bytes.Buffer)
+	buf := GetBuffer()
+	defer PutBuffer(buf)
 	rt := rv.Type()
 	info, err := cdc.getTypeInfo_wlock(rt)
 	if err != nil {
@@ -254,13 +258,12 @@ func (cdc *Codec) MarshalBinaryBare(o interface{}) ([]byte, error) {
 		}
 	}
 
-	err = cdc.encodeReflectBinaryToBuffer(buf, info, rv, FieldOptions{BinFieldNum: 1}, true)
+	err = cdc.encodeReflectBinaryToBuffer(&buf.Buffer, info, rv, FieldOptions{BinFieldNum: 1}, true)
 	if err != nil {
 		return nil, err
 	}
-	bz = buf.Bytes()
 
-	return bz, nil
+	return GetBytesBufferCopy(&buf.Buffer), nil
 }
 
 func (cdc *Codec) MarshalBinaryBareToWriter(writer io.Writer, o interface{}) error {
@@ -439,7 +442,8 @@ func (cdc *Codec) MarshalBinaryBareWithRegisteredMarshaller(o interface{}) ([]by
 	}
 
 	var typeName string
-	var buf bytes.Buffer
+	buf := GetBuffer()
+	defer PutBuffer(buf)
 
 	if info.Type.Kind() == reflect.Interface {
 		var iinfo = info
@@ -503,7 +507,8 @@ func (cdc *Codec) MarshalBinaryBareWithRegisteredMarshaller(o interface{}) ([]by
 		if err != nil {
 			return nil, err
 		}
-		return buf.Bytes(), nil
+
+		return GetBytesBufferCopy(&buf.Buffer), nil
 	} else {
 		return nil, fmt.Errorf("can't find unmarshaller")
 	}
@@ -683,7 +688,10 @@ func (cdc *Codec) MarshalJSON(o interface{}) ([]byte, error) {
 		return []byte("null"), nil
 	}
 	rt := rv.Type()
-	w := new(bytes.Buffer)
+
+	w := GetBuffer()
+	defer PutBuffer(w)
+
 	info, err := cdc.getTypeInfo_wlock(rt)
 	if err != nil {
 		return nil, err
@@ -714,7 +722,8 @@ func (cdc *Codec) MarshalJSON(o interface{}) ([]byte, error) {
 			return nil, err
 		}
 	}
-	return w.Bytes(), nil
+
+	return GetBytesBufferCopy(&w.Buffer), nil
 }
 
 // MustMarshalJSON panics if an error occurs. Besides tha behaves exactly like MarshalJSON.
@@ -771,10 +780,13 @@ func (cdc *Codec) MarshalJSONIndent(o interface{}, prefix, indent string) ([]byt
 	if err != nil {
 		return nil, err
 	}
-	var out bytes.Buffer
-	err = json.Indent(&out, bz, prefix, indent)
+
+	out := GetBuffer()
+	defer PutBuffer(out)
+	err = json.Indent(&out.Buffer, bz, prefix, indent)
 	if err != nil {
 		return nil, err
 	}
-	return out.Bytes(), nil
+
+	return GetBytesBufferCopy(&out.Buffer), nil
 }
