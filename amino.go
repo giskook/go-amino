@@ -162,9 +162,7 @@ func (cdc *Codec) MarshalBinaryLengthPrefixed(o interface{}) ([]byte, error) {
 		return nil, err
 	}
 
-	bytesCopy := GetBytesBufferCopy(&buf.Buffer)
-
-	return bytesCopy, nil
+	return GetBytesBufferCopy(&buf.Buffer), nil
 }
 
 func (cdc *Codec) MarshalBinaryLengthPrefixedWithRegisteredMarshaller(o interface{}) ([]byte, error) {
